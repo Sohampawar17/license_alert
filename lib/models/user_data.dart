@@ -36,8 +36,8 @@ class UserLicenseData {
 
 class PUC {
   String? certificateNumber;
-  DateTime? dateOfExpiry;
-  DateTime? dateOfIssue;
+  String? dateOfExpiry;
+  String? dateOfIssue;
 
   PUC({this.certificateNumber, this.dateOfExpiry, this.dateOfIssue});
 
@@ -58,8 +58,8 @@ class PUC {
 
 class InsuranceDetails {
   String? address;
-  DateTime? dateOfExpiry;
-  DateTime? dateOfIssue;
+  String? dateOfExpiry;
+  String? dateOfIssue;
   String? insuranceCompany;
   String? name;
   String? policyNumber;
@@ -132,8 +132,8 @@ class VehicleDetails {
 
 class LicenseDetails {
   String? dLNO;
-  DateTime? dOE;
-  DateTime? dOI;
+  String? dOE;
+  String? dOI;
   String? pIN;
   String? address;
  
@@ -148,20 +148,20 @@ class LicenseDetails {
       this.name});
 
   LicenseDetails.fromJson(Map<String, dynamic> json) {
-    dLNO = json['DL_NO'];
-    dOE = json['DOE'];
-    dOI = json['DOI'];
-    pIN = json['PIN'];
+    dLNO = json['dlNo'];
+    dOE = json['doe'];
+    dOI = json['doi'];
+    pIN = json['pin'];
     address = json['address'];
     name = json['name'];
   }
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = Map<String, dynamic>();
-    data['DL_NO'] = dLNO;
-    data['DOE'] = dOE;
-    data['DOI'] = dOI;
-    data['PIN'] = pIN;
+    data['dlNo'] = dLNO;
+    data['doe'] = dOE;
+    data['doi'] = dOI;
+    data['pin'] = pIN;
     data['address'] = address;
     data['name'] = name;
     return data;

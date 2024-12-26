@@ -18,8 +18,8 @@ if(user != null){
 }
 else{
   Timer(const Duration(seconds: 3), ()=>Navigator.popAndPushNamed(context,Routes.loginPage));
-
 }
+
 }
 
   Future<bool> signInWithEmailAndPassword(String email, String password) async {

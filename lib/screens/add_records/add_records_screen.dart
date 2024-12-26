@@ -146,7 +146,6 @@ class _AddLicenseFormState extends State<AddLicenseForm> {
         'doi': _doiController.text,
         'pin': _pinController.text,
         'address': _addressController.text,
-        'authClass': selectedAuthClass,
       };
 String user= FirebaseAuth.instance.currentUser!.uid;
       // Add data to Firebase Realtime Database
@@ -300,7 +299,10 @@ class _AddPUCFormState extends State<AddPUCForm> {
   final TextEditingController _certificateNumberController = TextEditingController();
   final TextEditingController _pucDateOfIssueController = TextEditingController();
   final TextEditingController _pucDateOfExpiryController = TextEditingController();
-final databaseRef = FirebaseFirestore.instance.collection('licenses_data');  // Function to open the date picker
+
+final databaseRef = FirebaseFirestore.instance.collection('licenses_data');  
+
+// Function to open the date picker
   Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
     final DateTime? pickedDate = await showDatePicker(
       context: context,

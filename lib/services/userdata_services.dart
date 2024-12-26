@@ -1,6 +1,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import '../models/user_data.dart';
 import '../models/user_profile.dart';
@@ -16,8 +17,7 @@ Future<void> addOrUpdateLicenseData() async {
 
   // Check if a document with the same ID already exists
   final querySnapshot = await databaseRef.doc(currentUserId).get();
-print(querySnapshot);
-  if (querySnapshot.id.isNotEmpty) {
+  if (querySnapshot.data() == null) {
     // Document with the ID does not exist, create a new document
     await databaseRef.doc(user).set({
       "id": currentUserId,
@@ -31,45 +31,46 @@ print(querySnapshot);
 }
 
 // Fetch user data if exists
-Future<UserLicenseData> getUserLicenseData() async {
-  final docSnapshot = await databaseRef.doc(user).get();
-  if (docSnapshot.exists) {
-    final data = docSnapshot.data();
+Future<UserLicenseData> getUserLicenseData() async {  
+  final docSnapshot = await databaseRef.doc(user).get();  
+  if (docSnapshot.exists) {  
+    final data = docSnapshot.data();  
+    Logger().i(data); // Ensure this output matches expected structure  
 
-    if (data is Map<String, dynamic>) {
-      // Map the data into UserLicenseData model
-      return UserLicenseData.fromJson(data);
-    } else {
-      throw Exception('Unexpected data type: ${data.runtimeType}');
-    }
-  } else {
-    throw Exception('User data not found');
-  }
+    if (data is Map<String, dynamic>) {  
+      // Map the data into UserLicenseData model  
+      return UserLicenseData.fromJson(data);  
+    } else {  
+      throw Exception('Unexpected data type: ${data.runtimeType}');  
+    }  
+  } else {  
+    throw Exception('User data not found');  
+  }  
 }
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+Future<UserProfile?> getUserProfile() async {  
+  try {  
+    // Get the current user  
+    final user = FirebaseAuth.instance.currentUser;  
+    Logger().i(user);  
 
-  Future<UserProfile?> getUserProfile() async {
-    try {
-      // Get the current user
-      final user = FirebaseAuth.instance.currentUser;
-Logger().i(user);
-      if (user != null) {
-        // Fetch user data from the 'users' collection
-        DocumentSnapshot snapshot = await _db
-            .collection('users')
-            .doc(user.uid)
-            .get();
-print('User Profile fetched: ${snapshot.data()}');
+    if (user != null) {  
+      // Create a map from user properties  
+      final userMap = {  
+        'name': user.displayName, // Extract display name  
+        'email': user.email, // Extract email  
+        'profilePictureUrl': user.photoURL, // Extract photo URL  
+        'phoneNumber': user.phoneNumber, // Extract phone number  
+      };  
 
-        if (snapshot.exists) {
-          return UserProfile.fromMap(snapshot.data() as Map<String, dynamic>);
-        }
-      }
-    } catch (e) {
-      print('Error fetching user profile: $e');
-    }
-    return null;
-  }
+      // Create and return UserProfile from the map  
+      return UserProfile.fromMap(userMap);  
+    }  
+  } catch (e) {  
+    Logger().e('Error fetching user profile: $e');  
+  }  
+  return null;  
+}
 }
 
