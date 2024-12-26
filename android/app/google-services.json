@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "591354437516",
+    "firebase_url": "https://license-alert-c3765-default-rtdb.firebaseio.com",
+    "project_id": "license-alert-c3765",
+    "storage_bucket": "license-alert-c3765.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:591354437516:android:7f91d9e5ea22dfebc080a9",
+        "android_client_info": {
+          "package_name": "com.example.license_alert"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfO5z9BG_W1m-FNUXXNgWCAq-IJvLyR2w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

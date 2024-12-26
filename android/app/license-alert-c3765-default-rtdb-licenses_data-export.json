@@ -1,0 +1,35 @@
+{
+  "user_id_1": {
+    "PUC": {
+      "certificateNumber": "PUC56789",
+      "dateOfExpiry": "2024-06-15",
+      "dateOfIssue": "2023-06-15"
+    },
+    "insuranceDetails": {
+      "address": "456 Example St, City, PIN 654321",
+      "dateOfExpiry": "2024-01-01",
+      "dateOfIssue": "2023-01-01",
+      "insuranceCompany": "ABC Insurance Co.",
+      "name": "John Doe",
+      "policyNumber": "INS123456789",
+      "vehicleDetails": {
+        "engineNumber": "ENG12345ABC",
+        "vehicleModel": "2020",
+        "vehicleName": "Honda City",
+        "vehicleNumber": "MH12AB1234"
+      }
+    },
+    "licenseDetails": {
+      "DL_NO": "MH50 20210005115",
+      "DOE": "2041-09-14",
+      "DOI": "2021-09-20",
+      "PIN": "123456",
+      "address": "123 Example St, City, PIN 123456",
+      "authClass": [
+        "LMV",
+        "MCWG"
+      ],
+      "name": "John Doe"
+    }
+  }
+}
