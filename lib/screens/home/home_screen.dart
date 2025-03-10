@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';  
 import '../../models/user_data.dart';  
 import '../../services/authentication_serice.dart';  
-import '../../services/userdata_services.dart';  
+import '../../services/notification_service.dart';
+import '../../services/userdata_services.dart';
 import '../add_records/add_records_screen.dart';  
 import '../profile/profile_screen.dart';  
-import 'package:intl/intl.dart';  
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';  
+
+
 
 class HomeScreen extends StatefulWidget {  
   const HomeScreen({super.key});  
@@ -17,6 +20,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {  
   UserLicenseData userLicenseData = UserLicenseData();  
   int _selectedIndex = 0;  
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();  
+
 
   @override  
   void initState() {  
@@ -26,63 +31,83 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {  
         userLicenseData = data;  
       });  
-      _checkExpiryNotifications(data); // Check expiring items  
+NotificationService.scheduleNotifications(userLicenseData);
+      _showExpiringNotifications(); // Check expiring items  
     });  
   }  
+bool isExpiringSoon(String? expiryDate, {int thresholdDays = 7}) {
+  if (expiryDate == null || expiryDate.isEmpty) return false;
 
-  bool isExpiringSoon(String expiryDate) {  
-    try {  
-      final formatter = DateFormat("yyyy-MM-dd");  
-      final expiry = formatter.parse(expiryDate);  
-      final now = DateTime.now();  
-      return expiry.difference(now).inDays <= 30; // Alert if less than or equal to 30 days  
-    } catch (e) {  
-      Logger().e('Error parsing date: $expiryDate - $e');  
-      return false;  
-    }  
-  }  
+  try {
+    DateTime expiry = DateTime.parse(expiryDate);
+    final now = DateTime.now();
+    return expiry.difference(now).inDays <= thresholdDays;
+  } catch (e) {
+    debugPrint("Invalid date format: $expiryDate"); // Log for debugging
+    return false;
+  }
+}
 
-  void _checkExpiryNotifications(UserLicenseData data) {  
-    // Check for expiring license  
-    if (data.licenseDetails != null &&  
-        isExpiringSoon(data.licenseDetails!.dOE.toString())) {  
-      _showNotification("License Expiry Alert",  
-          "Your driving license is expiring soon on ${data.licenseDetails!.dOE}.");  
-    }  
-    // Check for expiring insurance  
-    if (data.insuranceDetails != null &&  
-        isExpiringSoon(data.insuranceDetails!.dateOfExpiry.toString())) {  
-      _showNotification("Insurance Expiry Alert",  
-          "Your insurance policy is expiring soon on ${data.insuranceDetails!.dateOfExpiry}.");  
-    }  
-    // Check for expiring PUC  
-    if (data.pUC != null &&  
-        isExpiringSoon(data.pUC!.dateOfExpiry.toString())) {  
-      _showNotification("PUC Expiry Alert",  
-          "Your PUC certificate is expiring soon on ${data.pUC!.dateOfExpiry}.");  
-    }  
-  }  
 
-  void _showNotification(String title, String message) {  
-    showDialog(  
-      context: context,  
-      builder: (BuildContext context) {  
-        return AlertDialog(  
-          title: Text(title),  
-          content: Text(message),  
-          actions: [  
-            TextButton(  
-              onPressed: () {  
-                Navigator.of(context).pop();  
-              },  
-              child: const Text("OK"),  
-            ),  
-          ],  
-        );  
-      },  
-    );  
-  }  
+  // Show SnackBar Alerts for each expiring item
+  void _showExpiringNotifications() {
+    List<String> expiringAlerts = [];
 
+    if (userLicenseData.licenseDetails != null && isExpiringSoon(userLicenseData.licenseDetails!.dOE.toString())) {
+      expiringAlerts.add("License is expiring soon on ${userLicenseData.licenseDetails!.dOE.toString()}");
+    }
+    if (userLicenseData.insuranceDetails != null && isExpiringSoon(userLicenseData.insuranceDetails!.dateOfExpiry.toString())) {
+      expiringAlerts.add("Insurance is expiring soon on ${userLicenseData.insuranceDetails!.dateOfExpiry.toString()}");
+    }
+    if (userLicenseData.pUC != null && isExpiringSoon(userLicenseData.pUC!.dateOfExpiry.toString())) {
+      expiringAlerts.add("PUC is expiring soon on ${userLicenseData.pUC!.dateOfExpiry.toString()}");
+    }
+
+    for (var alert in expiringAlerts) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(alert),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      });
+    }
+  }
+
+  // Show Material Banner for Expiring Items
+Widget _buildBannerIfExpiring() {
+  List<String> expiringAlerts = [];
+
+   if (userLicenseData.licenseDetails != null && isExpiringSoon(userLicenseData.licenseDetails!.dOE.toString())) {
+    expiringAlerts.add("License is expiring soon on ${userLicenseData.licenseDetails!.dOE.toString()}");
+  }
+  if (userLicenseData.insuranceDetails != null && isExpiringSoon(userLicenseData.insuranceDetails!.dateOfExpiry.toString())) {
+    expiringAlerts.add("Insurance is expiring soon on ${userLicenseData.insuranceDetails!.dateOfExpiry.toString()}");
+  }
+  if (userLicenseData.pUC != null && isExpiringSoon(userLicenseData.pUC!.dateOfExpiry.toString())) {
+    expiringAlerts.add("PUC is expiring soon on ${userLicenseData.pUC!.dateOfExpiry.toString()}");
+  }
+
+  if (expiringAlerts.isEmpty) return const SizedBox.shrink();
+  return Column(
+    children: expiringAlerts.map((alert) {
+      return MaterialBanner(
+        content: Text(alert, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+        leading: const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 32),
+        backgroundColor: Colors.yellow[100],
+        actions: [
+          TextButton(
+            onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+            child: const Text("DISMISS", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      );
+    }).toList(),
+  );
+}
+  
   void _onItemTapped(int index) {  
     setState(() {  
       _selectedIndex = index;  
@@ -91,15 +116,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override  
   Widget build(BuildContext context) {  
-    final List<Widget> _pages = <Widget>[  
+    final List<Widget> pages = <Widget>[  
       Scaffold(  
         appBar: AppBar(  
           automaticallyImplyLeading: false,
           backgroundColor: Colors.lightBlueAccent,  
           elevation: 0,  
-          title: Column(  
+          title: const Column(  
             crossAxisAlignment: CrossAxisAlignment.start,  
-            children: const [  
+            children: [  
               Text(  
                 "License Alert",  
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),  
@@ -127,12 +152,46 @@ class _HomeScreenState extends State<HomeScreen> {
               return const Center(child: CircularProgressIndicator());  
             } else if (snapshot.hasError) {  
               Logger().i("Error fetching user license data");  
-              return Center(child: const Text('Error fetching data'));  
+              return Center(  
+      // If there is an error, handle it here
+    child:  Column(
+        children: [
+          
+          ElevatedButton(
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const AddLicenseForm()),
+        );
+      },
+      child: const Text('Add License'),
+    ),
+    ElevatedButton(
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const AddInsuranceForm()),
+        );
+      },
+      child: const Text('Add Insurance'),
+    ),
+    ElevatedButton(
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const AddPUCForm()),
+        );
+      },
+      child: const Text('Add PUC'),
+    )
+        ],
+      ));  
             } else if (snapshot.hasData) {  
               UserLicenseData data = snapshot.data!;  
               return SingleChildScrollView(  
                 child: Column(  
                   children: [  
+                    _buildBannerIfExpiring(),
                     const SizedBox(height: 16),  
                     Row(  
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,  
@@ -177,7 +236,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       'Insurance Company: ${data.insuranceDetails?.insuranceCompany ?? "N/A"}',
                       'Date of Expiry: ${data.insuranceDetails?.dateOfExpiry ?? "N/A"}',
                     ],
-                    isExpiring: isExpiringSoon(data.insuranceDetails?.dateOfExpiry.toString() ?? ""),
+                    isExpiring:false,
                   ) :  ElevatedButton(
         onPressed: () {
           Navigator.push(
@@ -193,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildAlertCard(
                     "PUC Details",
                     [
-                      'Certificate Number: ${data.pUC?.certificateNumber ?? "N/A"}',
+                      'PUC Number: ${data.pUC?.certificateNumber ?? "N/A"}',
                       'Date of Expiry: ${data.pUC?.dateOfExpiry ?? "N/A"}',
                     ],
                     isExpiring: isExpiringSoon(data.pUC?.dateOfExpiry.toString() ?? ""),
@@ -218,12 +277,13 @@ class _HomeScreenState extends State<HomeScreen> {
           },  
         ),  
       ),  
-      const ProfilePage(),  
-       HelpPage(),  
+     
+       const HelpPage(), 
+        const ProfilePage(),   
     ];  
 
     return Scaffold(  
-      body: _pages[_selectedIndex],  
+      body: pages[_selectedIndex],  
       bottomNavigationBar: BottomNavigationBar(  
         type: BottomNavigationBarType.fixed,  
         backgroundColor: Colors.lightBlueAccent,  
@@ -234,45 +294,89 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(  
             icon: Icon(Icons.home),  
             label: 'Home',  
-          ),  
+          ), 
+           BottomNavigationBarItem(  
+            icon: Icon(Icons.edit_document),  
+            label: 'Documents',  
+          ), 
           BottomNavigationBarItem(  
             icon: Icon(Icons.account_circle),  
             label: 'Profile',  
           ),  
-          BottomNavigationBarItem(  
-            icon: Icon(Icons.help),  
-            label: 'Help',  
-          ),  
+           
         ],  
       ),  
     );  
   }  
 
-  Widget _buildVirtualCard(String title, String dlNo, String certificateNumber) {  
-    return Container(  
-      width: 160,  
-      padding: const EdgeInsets.all(16),  
-      decoration: BoxDecoration(  
-        borderRadius: BorderRadius.circular(8),  
-        border: Border.all(color: Colors.grey.shade300),  
-      ),  
-      child: Column(  
-        children: [  
-          Icon(  
-            title == "My Virtual DL" ? Icons.card_membership : Icons.assignment,  
-            size: 40,  
-            color: Colors.lightBlue,  
-          ),  
-          const SizedBox(height: 8),  
-          Text(title, textAlign: TextAlign.center),  
-          if (title == "My Virtual DL")  
-            Text("DL No: ${dlNo}"),  
-          if (title == "My Virtual PUC")  
-            Text("Certificate No: ${certificateNumber}"),  
-        ],  
-      ),  
-    );  
-  }  
+   Widget _buildVirtualCard(String title, String dlNo, String certificateNumber) {
+    return Container(
+      width: 180,
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.lightBlue.shade400, Colors.blue.shade700],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 6,
+            offset: const Offset(2, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            padding: const EdgeInsets.all(12),
+            child: Icon(
+              title == "My Virtual DL" ? Icons.card_membership : Icons.assignment,
+              size: 50,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (title == "My Virtual DL")
+            Text(
+              "DL No: $dlNo",
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.white70,
+              ),
+            ),
+          if (title == "My Virtual PUC")
+            Text(
+              "PUC No: $certificateNumber",
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.white70,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildAlertCard(String title, List<String> details, {required bool isExpiring}) {  
     return Card(  
@@ -287,7 +391,7 @@ class _HomeScreenState extends State<HomeScreen> {
         subtitle: Column(  
           crossAxisAlignment: CrossAxisAlignment.start,  
           children: [  
-            ...details.map((detail) => Text(detail)).toList(),  
+            ...details.map((detail) => Text(detail)),  
             Text(  
               "We will notify you 3 days before expiry.",  
               style: TextStyle(color: isExpiring ? Colors.red : Colors.blue),  
@@ -307,26 +411,120 @@ class _HomeScreenState extends State<HomeScreen> {
 }  
 
 // Help Page widget  
-class HelpPage extends StatelessWidget {  
-  @override  
-  Widget build(BuildContext context) {  
-    return Scaffold(  
-      appBar: AppBar(  
-        backgroundColor: Colors.lightBlueAccent,  
-        title: const Text("Help"),  
-      ),  
-      body: const Center(  
-        child: Column(  
-          mainAxisAlignment: MainAxisAlignment.center,  
-          children: [  
-            Icon(Icons.help, size: 100, color: Colors.lightBlue),  
-            SizedBox(height: 20),  
-            Text("Help Page", style: TextStyle(fontSize: 24)),  
-            SizedBox(height: 20),  
-            Text("Here you can find help and support.", textAlign: TextAlign.center),  
-          ],  
-        ),  
-      ),  
-    );  
-  }  
+class HelpPage extends StatefulWidget {
+  const HelpPage({super.key});
+
+  @override
+  State<HelpPage> createState() => _HelpPageState();
+}
+
+class _HelpPageState extends State<HelpPage> {
+  UserLicenseData userLicenseData = UserLicenseData();
+  bool isLoading = true; // Loading state
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserLicenseData();
+  }
+
+  void _fetchUserLicenseData() async {
+    setState(() => isLoading = true); // Show loading indicator
+    final data = await FirebaseService().getUserLicenseData();
+    setState(() {
+      userLicenseData = data;
+      isLoading = false; // Hide loading indicator
+    });
+  }
+
+  void navigateToForm(Widget formScreen) {
+    Navigator.push(context, MaterialPageRoute(builder: (context) => formScreen))
+        .then((_) => _fetchUserLicenseData()); // Refresh data after returning
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Vehicle Documents"),
+        backgroundColor: Colors.lightBlueAccent,
+      ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator()) // Show loading bar
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDocumentSection(
+                    title: "License",
+                    exists: userLicenseData.licenseDetails?.address != null,
+                    dateOfExpiry: userLicenseData.licenseDetails?.dOE,
+                    onPressed: () => navigateToForm(const AddLicenseForm()),
+                  ),
+                  _buildDocumentSection(
+                    title: "PUC",
+                    exists: userLicenseData.pUC?.certificateNumber != null,
+                    dateOfExpiry: userLicenseData.pUC?.dateOfExpiry,
+                    onPressed: () => navigateToForm(const AddPUCForm()),
+                  ),
+                  _buildDocumentSection(
+                    title: "Insurance",
+                    exists: userLicenseData.insuranceDetails?.insuranceCompany != null,
+                    dateOfExpiry: userLicenseData.insuranceDetails?.dateOfExpiry,
+                    onPressed: () => navigateToForm(const AddInsuranceForm()),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildDocumentSection({
+    required String title,
+    required bool exists,
+    String? dateOfExpiry,
+    required VoidCallback onPressed,
+  }) {
+    return Card(
+      elevation: 5,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.symmetric(vertical: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Row(
+          children: [
+            Icon(Icons.description, color: exists ? Colors.green : Colors.blue, size: 32),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Expiry Date: ${dateOfExpiry ?? 'N/A'}",
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                  ),
+                ],
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: isLoading ? null : onPressed, // Disable button while loading
+              icon: Icon(exists ? Icons.edit : Icons.add),
+              label: Text(exists ? "Update" : "Create"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: exists ? Colors.green : Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

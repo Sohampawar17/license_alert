@@ -1,6 +1,7 @@
 
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -10,6 +11,7 @@ import '../router.router.dart';
 
 class AuthenticationService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
+ final databaseRef = FirebaseFirestore.instance.collection('users');
 
 void isLogin(BuildContext context){
 final user=  _firebaseAuth.currentUser;
@@ -71,6 +73,13 @@ else{
         email: email,
         password: password,
       );
+
+       await databaseRef.doc(_firebaseAuth.currentUser?.email).set({
+        "name":"",
+      "email": _firebaseAuth.currentUser?.email,
+      "phone":""
+      // Add other fields as necessary
+    });
       Fluttertoast.showToast(
             msg: "User signed up with email: $email",
             toastLength: Toast.LENGTH_LONG,

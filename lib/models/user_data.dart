@@ -19,7 +19,7 @@ class UserLicenseData {
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = Map<String, dynamic>();
+    final Map<String, dynamic> data = <String, dynamic>{};
     if (pUC != null) {
       data['PUC'] = pUC!.toJson();
     }
@@ -48,7 +48,7 @@ class PUC {
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = Map<String, dynamic>();
+    final Map<String, dynamic> data = <String, dynamic>{};
     data['certificateNumber'] = certificateNumber;
     data['dateOfExpiry'] = dateOfExpiry;
     data['dateOfIssue'] = dateOfIssue;
@@ -87,7 +87,7 @@ class InsuranceDetails {
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = Map<String, dynamic>();
+    final Map<String, dynamic> data = <String, dynamic>{};
     data['address'] = address;
     data['dateOfExpiry'] = dateOfExpiry;
     data['dateOfIssue'] = dateOfIssue;
@@ -121,7 +121,7 @@ class VehicleDetails {
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = Map<String, dynamic>();
+    final Map<String, dynamic> data = <String, dynamic>{};
     data['engineNumber'] = engineNumber;
     data['vehicleModel'] = vehicleModel;
     data['vehicleName'] = vehicleName;
@@ -157,7 +157,7 @@ class LicenseDetails {
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = Map<String, dynamic>();
+    final Map<String, dynamic> data = <String, dynamic>{};
     data['dlNo'] = dLNO;
     data['doe'] = dOE;
     data['doi'] = dOI;

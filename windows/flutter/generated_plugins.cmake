@@ -3,13 +3,14 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  awesome_notifications
   cloud_firestore
   connectivity_plus
   dynamic_color
   file_selector_windows
   firebase_auth
   firebase_core
-  geolocator_windows
+  firebase_storage
   permission_handler_windows
   url_launcher_windows
 )

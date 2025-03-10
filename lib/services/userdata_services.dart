@@ -1,7 +1,6 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import '../models/user_data.dart';
 import '../models/user_profile.dart';
@@ -21,12 +20,11 @@ Future<void> addOrUpdateLicenseData() async {
     // Document with the ID does not exist, create a new document
     await databaseRef.doc(user).set({
       "id": currentUserId,
+      
       // Add other fields as necessary
     });
-    print("Document created successfully.");
   } else {
     // Document already exists
-    print("Document with ID already exists. Skipping creation.");
   }
 }
 
@@ -48,7 +46,6 @@ Future<UserLicenseData> getUserLicenseData() async {
   }  
 }
 
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
 Future<UserProfile?> getUserProfile() async {  
   try {  
     // Get the current user  
@@ -61,7 +58,7 @@ Future<UserProfile?> getUserProfile() async {
         'name': user.displayName, // Extract display name  
         'email': user.email, // Extract email  
         'profilePictureUrl': user.photoURL, // Extract photo URL  
-        'phoneNumber': user.phoneNumber, // Extract phone number  
+        'phone': user.phoneNumber, // Extract phone number  
       };  
 
       // Create and return UserProfile from the map  

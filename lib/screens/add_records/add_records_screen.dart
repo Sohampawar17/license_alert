@@ -1,11 +1,6 @@
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
-import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
-import 'package:flutter/material.dart';
-
-import '../../router.router.dart';
 
 class AddLicenseForm extends StatefulWidget {
   const AddLicenseForm({super.key});
@@ -13,6 +8,7 @@ class AddLicenseForm extends StatefulWidget {
   @override
   _AddLicenseFormState createState() => _AddLicenseFormState();
 }
+
 class _AddLicenseFormState extends State<AddLicenseForm> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _dlNoController = TextEditingController();
@@ -21,12 +17,38 @@ class _AddLicenseFormState extends State<AddLicenseForm> {
   final TextEditingController _pinController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
   List<String> authClass = ['Class A', 'Class B', 'Class C'];
-  String selectedAuthClass = 'Class A'; // Default selection
+  String selectedAuthClass = 'Class A';
 
-  final databaseRef = FirebaseFirestore.instance.collection('licenses_data'); // Reference to the 'licenses' node
+  final databaseRef = FirebaseFirestore.instance.collection('licenses_data');
+@override
+void initState() {
+  super.initState();
+  _fetchLicenseData();
+}
 
-  // Function to open the date picker
-  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
+Future<void> _fetchLicenseData() async {
+  String user = FirebaseAuth.instance.currentUser!.uid;
+  DocumentSnapshot docSnapshot = await databaseRef.doc(user).get();
+
+  if (docSnapshot.exists) {
+    var data = docSnapshot.data() as Map<String, dynamic>;
+    if (data.containsKey('licenseDetails')) {
+      var licenseData = data['licenseDetails'];
+      setState(() {
+        _dlNoController.text = licenseData['dlNo'] ?? '';
+        _doeController.text = licenseData['doe'] ?? '';
+        _doiController.text = licenseData['doi'] ?? '';
+        _pinController.text = licenseData['pin'] ?? '';
+        _addressController.text = licenseData['address'] ?? '';
+        selectedAuthClass = licenseData['authorizationClass'] ?? 'Class A';
+      });
+    }
+  }
+}
+
+
+  Future<void> _selectDate(
+      BuildContext context, TextEditingController controller) async {
     final DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -34,134 +56,190 @@ class _AddLicenseFormState extends State<AddLicenseForm> {
       lastDate: DateTime(2101),
     );
     if (pickedDate != null) {
-      controller.text = "${pickedDate.toLocal()}".split(' ')[0]; // Set the selected date
+      controller.text = "${pickedDate.toLocal()}".split(' ')[0];
     }
   }
+
+  Widget _buildInputField(
+      TextEditingController controller, String label, IconData icon,
+      {bool isNumber = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: controller,
+            keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+            decoration: InputDecoration(
+              hintText: label,
+              prefixIcon: Icon(icon, color: Colors.blueAccent),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0),
+            ),
+            validator: (value) =>
+                value == null || value.isEmpty ? 'Please enter $label' : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateField(
+      TextEditingController controller, String label, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: controller,
+            readOnly: true,
+            onTap: () => _selectDate(context, controller),
+            decoration: InputDecoration(
+              hintText: label,
+              prefixIcon: Icon(icon, color: Colors.blueAccent),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0),
+            ),
+            validator: (value) =>
+                value == null || value.isEmpty ? 'Please enter $label' : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDropdownField() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: DropdownButtonFormField<String>(
+        value: selectedAuthClass,
+        decoration: InputDecoration(
+          labelText: 'Authorization Class',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8.0),
+          ),
+        ),
+        onChanged: (String? newValue) {
+          setState(() {
+            selectedAuthClass = newValue!;
+          });
+        },
+        items: authClass.map((classItem) {
+          return DropdownMenuItem<String>(
+            value: classItem,
+            child: Text(classItem),
+          );
+        }).toList(),
+      ),
+    );
+  }
+Future<void> _submitForm() async {
+  if (_formKey.currentState?.validate() ?? false) {
+    String user = FirebaseAuth.instance.currentUser!.uid;
+
+    var licenseData = {
+      'dlNo': _dlNoController.text,
+      'doe': _doeController.text,
+      'doi': _doiController.text,
+      'pin': _pinController.text,
+      'address': _addressController.text,
+      'authorizationClass': selectedAuthClass,
+    };
+
+    DocumentReference userDoc = databaseRef.doc(user);
+
+    // Check if document exists
+    DocumentSnapshot docSnapshot = await userDoc.get();
+
+    if (docSnapshot.exists) {
+      // Update the document if it exists
+      await userDoc.update({
+        "licenseDetails": licenseData,
+      });
+    } else {
+      // Create the document if it doesn’t exist
+      await userDoc.set({
+        "id": user,
+        "licenseDetails": licenseData,
+      });
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('License saved successfully')),
+    );
+
+    Navigator.pop(context);
+  }
+}
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add License'),
+        backgroundColor: Colors.lightBlueAccent,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: <Widget>[
-              // License Form Fields
-              TextFormField(
-                controller: _dlNoController,
-                decoration: const InputDecoration(labelText: 'DL Number'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter DL number';
-                  }
-                  return null;
-                },
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      const Text('* Required Field',
+                          style: TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 16),
+                      _buildInputField(
+                          _dlNoController, 'DL Number*', Icons.credit_card),
+                      _buildDateField(
+                          _doiController, 'Date of Issue*', Icons.event),
+                      _buildDateField(
+                          _doeController, 'Date of Expiry*', Icons.event),
+                      _buildInputField(_pinController, 'PIN Code*', Icons.pin,
+                          isNumber: true),
+                      _buildInputField(
+                          _addressController, 'Address*', Icons.location_on),
+                      _buildDropdownField(),
+                    ],
+                  ),
+                ),
               ),
-              TextFormField(
-                controller: _doeController,
-                decoration: const InputDecoration(labelText: 'Date of Expiry'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter date of expiry';
-                  }
-                  return null;
-                },
-                onTap: () => _selectDate(context, _doeController),
-                readOnly: true, // Make the text field read-only to show date picker
-              ),
-              TextFormField(
-                controller: _doiController,
-                decoration: const InputDecoration(labelText: 'Date of Issue'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter date of issue';
-                  }
-                  return null;
-                },
-                onTap: () => _selectDate(context, _doiController),
-                readOnly: true, // Make the text field read-only to show date picker
-              ),
-              TextFormField(
-                controller: _pinController,
-                decoration: const InputDecoration(labelText: 'PIN Code'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter PIN code';
-                  }
-                  return null;
-                },
-                keyboardType: TextInputType.number, // Set the keyboard type to number
-              ),
-              TextFormField(
-                controller: _addressController,
-                decoration: const InputDecoration(labelText: 'Address'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter address';
-                  }
-                  return null;
-                },
-              ),
-
-              // Authorization Class Dropdown
-              DropdownButtonFormField<String>(
-                value: selectedAuthClass,
-                decoration: const InputDecoration(labelText: 'Authorization Class'),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    selectedAuthClass = newValue!;
-                  });
-                },
-                items: authClass.map((classItem) {
-                  return DropdownMenuItem<String>(
-                    value: classItem,
-                    child: Text(classItem),
-                  );
-                }).toList(),
-              ),
-
-              // Submit Button
-              ElevatedButton(
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 16.0),
+              child: ElevatedButton(
                 onPressed: _submitForm,
-                child: const Text('Submit'),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                  backgroundColor: Colors.lightBlueAccent,
+                ),
+                child: const Text(
+                  'SAVE',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
-  }
-
-
-  Future<void> _submitForm() async {
-    if (_formKey.currentState?.validate() ?? false) {
-      // Gather the data
-      var licenseData = {
-        'dlNo': _dlNoController.text,
-        'doe': _doeController.text,
-        'doi': _doiController.text,
-        'pin': _pinController.text,
-        'address': _addressController.text,
-      };
-String user= FirebaseAuth.instance.currentUser!.uid;
-      // Add data to Firebase Realtime Database
-     await databaseRef.doc(user).update({
-  "id": FirebaseAuth.instance.currentUser!.uid,
-  "licenseDetails": licenseData,  // Directly passing the map
-}); // Generate a new key for the license data
-
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('License added successfully')),
-      );
-
-      // Optionally, navigate back or reset the form
-        Navigator.popAndPushNamed(context,Routes.homeScreen); // Go back to the previous screen after submission
-    }
   }
 }
 
@@ -174,117 +252,161 @@ class AddInsuranceForm extends StatefulWidget {
 
 class _AddInsuranceFormState extends State<AddInsuranceForm> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _insuranceCompanyController = TextEditingController();
+  final TextEditingController _insuranceCompanyController =
+      TextEditingController();
   final TextEditingController _policyNumberController = TextEditingController();
   final TextEditingController _vehicleNameController = TextEditingController();
   final TextEditingController _vehicleModelController = TextEditingController();
-  final TextEditingController _vehicleNumberController = TextEditingController();
-final databaseRef = FirebaseFirestore.instance.collection('licenses_data'); // Reference to the 'insurance' node
+  final TextEditingController _vehicleNumberController =
+      TextEditingController();
+
+  final databaseRef = FirebaseFirestore.instance.collection('licenses_data');
+@override
+void initState() {
+  super.initState();
+  _fetchInsuranceData();
+}
+
+Future<void> _fetchInsuranceData() async {
+  String user = FirebaseAuth.instance.currentUser!.uid;
+  DocumentSnapshot docSnapshot = await databaseRef.doc(user).get();
+
+  if (docSnapshot.exists) {
+    var data = docSnapshot.data() as Map<String, dynamic>;
+    if (data.containsKey('insuranceDetails')) {
+      var insuranceData = data['insuranceDetails'];
+      setState(() {
+        _insuranceCompanyController.text = insuranceData['insuranceCompany'] ?? '';
+        _policyNumberController.text = insuranceData['policyNumber'] ?? '';
+        _vehicleNameController.text = insuranceData['vehicleName'] ?? '';
+        _vehicleModelController.text = insuranceData['vehicleModel'] ?? '';
+        _vehicleNumberController.text = insuranceData['vehicleNumber'] ?? '';
+      });
+    }
+  }
+}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Insurance'),
+        backgroundColor: Colors.lightBlueAccent,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: <Widget>[
-              // Insurance Form Fields
-              TextFormField(
-                controller: _insuranceCompanyController,
-                decoration: const InputDecoration(labelText: 'Insurance Company'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter insurance company';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _policyNumberController,
-                decoration: const InputDecoration(labelText: 'Policy Number'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter policy number';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _vehicleNameController,
-                decoration: const InputDecoration(labelText: 'Vehicle Name'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter vehicle name';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _vehicleModelController,
-                decoration: const InputDecoration(labelText: 'Vehicle Model'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter vehicle model';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _vehicleNumberController,
-                decoration: const InputDecoration(labelText: 'Vehicle Number'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter vehicle number';
-                  }
-                  return null;
-                },
-              ),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                        const Text('* Required Field', style: TextStyle(color: Colors.grey)),
+                        const SizedBox(height: 16),
 
-              // Submit Button
-              ElevatedButton(
-                onPressed: _submitForm,
-                child: const Text('Submit'),
+                      _buildTextField(_insuranceCompanyController,
+                          'Insurance Company*', Icons.business),
+                      _buildTextField(_policyNumberController, 'Policy Number*',
+                          Icons.policy),
+                      _buildTextField(_vehicleNameController, 'Vehicle Name*',
+                          Icons.directions_car),
+                      _buildTextField(_vehicleModelController, 'Vehicle Model*',
+                          Icons.car_rental),
+                      _buildTextField(_vehicleNumberController,
+                          'Vehicle Number*', Icons.confirmation_number),
+                    ],
+                  ),
+                ),
               ),
-            ],
-          ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 16.0),
+              child: ElevatedButton(
+                onPressed: _submitForm,
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                  backgroundColor: Colors.lightBlueAccent,
+                ),
+                child: const Text(
+                  'SAVE',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Future<void> _submitForm() async {
-    if (_formKey.currentState?.validate() ?? false) {
-      // Gather the data
-      var insuranceData = {
-        'insuranceCompany': _insuranceCompanyController.text,
-        'policyNumber': _policyNumberController.text,
-        'vehicleName': _vehicleNameController.text,
-        'vehicleModel': _vehicleModelController.text,
-        'vehicleNumber': _vehicleNumberController.text,
-      };
-String user= FirebaseAuth.instance.currentUser!.uid;
-
-// Generate a new key for the insurance data
-          // Add data to Firebase Realtime Database
-     await databaseRef.doc(user).update({
-  "id": FirebaseAuth.instance.currentUser!.uid,
-"insuranceDetails": insuranceData,   // Directly passing the map
-});
-
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Insurance added successfully')),
-      );
-
-      // Optionally, navigate back or reset the form
-        Navigator.popAndPushNamed(context,Routes.homeScreen); // Go back to the previous screen after submission
-    }
+  Widget _buildTextField(
+      TextEditingController controller, String label, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: controller,
+            decoration: InputDecoration(
+              hintText: label,
+              prefixIcon: Icon(icon, color: Colors.blueAccent),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0),
+            ),
+            validator: (value) =>
+                value == null || value.isEmpty ? 'Please enter $label' : null,
+          ),
+        ],
+      ),
+    );
   }
+Future<void> _submitForm() async {
+  if (_formKey.currentState?.validate() ?? false) {
+    String user = FirebaseAuth.instance.currentUser!.uid;
+
+    var insuranceData = {
+      'insuranceCompany': _insuranceCompanyController.text,
+      'policyNumber': _policyNumberController.text,
+      'vehicleName': _vehicleNameController.text,
+      'vehicleModel': _vehicleModelController.text,
+      'vehicleNumber': _vehicleNumberController.text,
+    };
+
+    DocumentReference userDoc = databaseRef.doc(user);
+
+    // Check if document exists
+    DocumentSnapshot docSnapshot = await userDoc.get();
+
+    if (docSnapshot.exists) {
+      // Update the document if it exists
+      await userDoc.update({
+        "insuranceDetails": insuranceData,
+      });
+    } else {
+      // Create the document if it doesn’t exist
+      await userDoc.set({
+        "id": user,
+        "insuranceDetails": insuranceData,
+      });
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Insurance saved successfully')),
+    );
+
+    Navigator.pop(context);
+  }
+}
+
 }
 
 class AddPUCForm extends StatefulWidget {
@@ -296,14 +418,39 @@ class AddPUCForm extends StatefulWidget {
 
 class _AddPUCFormState extends State<AddPUCForm> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _certificateNumberController = TextEditingController();
-  final TextEditingController _pucDateOfIssueController = TextEditingController();
-  final TextEditingController _pucDateOfExpiryController = TextEditingController();
+  final TextEditingController _certificateNumberController =
+      TextEditingController();
+  final TextEditingController _pucDateOfIssueController =
+      TextEditingController();
+  final TextEditingController _pucDateOfExpiryController =
+      TextEditingController();
 
-final databaseRef = FirebaseFirestore.instance.collection('licenses_data');  
+  final databaseRef = FirebaseFirestore.instance.collection('licenses_data');
+  @override
+void initState() {
+  super.initState();
+  _fetchPUCData();
+}
+Future<void> _fetchPUCData() async {
+  String user = FirebaseAuth.instance.currentUser!.uid;
+  DocumentSnapshot docSnapshot = await databaseRef.doc(user).get();
 
-// Function to open the date picker
-  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
+  if (docSnapshot.exists) {
+    var data = docSnapshot.data() as Map<String, dynamic>;
+    if (data.containsKey('PUC')) {
+      var pucData = data['PUC'];
+      setState(() {
+        // Example fields for PUC (modify based on actual Firestore data)
+        _certificateNumberController.text=pucData['certificateNumber'] ?? '';
+        _pucDateOfIssueController.text = pucData['dateOfIssue'] ?? '';
+        _pucDateOfExpiryController.text = pucData['dateOfExpiry'] ?? '';
+      });
+    }
+  }
+}
+
+  Future<void> _selectDate(
+      BuildContext context, TextEditingController controller) async {
     final DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -311,100 +458,144 @@ final databaseRef = FirebaseFirestore.instance.collection('licenses_data');
       lastDate: DateTime(2101),
     );
     if (pickedDate != null) {
-      controller.text = "${pickedDate.toLocal()}".split(' ')[0]; // Set the selected date
+      setState(() {
+        controller.text = "${pickedDate.toLocal()}".split(' ')[0];
+      });
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add PUC'),
+        backgroundColor: Colors.lightBlueAccent,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: <Widget>[
-              // PUC Form Fields
-              TextFormField(
-                controller: _certificateNumberController,
-                decoration: const InputDecoration(labelText: 'PUC Certificate Number'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter certificate number';
-                  }
-                  return null;
-                },
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('* Required Field',
+                          style: TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 16),
+                      _buildTextField(_certificateNumberController,
+                          'PUC Certificate Number*', Icons.confirmation_number),
+                      _buildDateField(_pucDateOfIssueController,
+                          'PUC Date of Issue*', Icons.calendar_today),
+                      _buildDateField(_pucDateOfExpiryController,
+                          'PUC Date of Expiry*', Icons.calendar_today),
+                    ],
+                  ),
+                ),
               ),
-              TextFormField(
-  controller: _pucDateOfIssueController,
-  decoration: const InputDecoration(labelText: 'PUC Date of Issue'),
-  validator: (value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter date of issue';
-    }
-    return null;
-  },
-  onTap: () => _selectDate(context, _pucDateOfIssueController),
-  readOnly: true, // Make the text field read-only to show date picker
-),
-TextFormField(
-  controller: _pucDateOfExpiryController,
-  decoration: const InputDecoration(labelText: 'PUC Date of Expiry'),
-  validator: (value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter date of expiry';
-    }
-    return null;
-  },
-  onTap: () => _selectDate(context, _pucDateOfExpiryController),
-  readOnly: true, // Make the text field read-only to show date picker
-),
-
-              // Submit Button
-              ElevatedButton(
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 16.0),
+              child: ElevatedButton(
                 onPressed: _submitForm,
-                child: const Text('Submit'),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                  backgroundColor: Colors.lightBlueAccent,
+                ),
+                child: const Text(
+                  'SAVE',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(
+      TextEditingController controller, String label, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: controller,
+            decoration: InputDecoration(
+              hintText: label,
+              prefixIcon: Icon(icon, color: Colors.blueAccent),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0),
+            ),
+            validator: (value) =>
+                value == null || value.isEmpty ? 'Please enter $label' : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateField(
+      TextEditingController controller, String label, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: controller,
+            decoration: InputDecoration(
+              labelText: label,
+              prefixIcon: Icon(icon, color: Colors.blueAccent),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.date_range, color: Colors.blueAccent),
+                onPressed: () => _selectDate(context, controller),
+              ),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            validator: (value) =>
+                value == null || value.isEmpty ? 'Please select $label' : null,
+            readOnly: true,
+            onTap: () => _selectDate(context, controller),
+          ),
+        ],
       ),
     );
   }
 
   Future<void> _submitForm() async {
     if (_formKey.currentState?.validate() ?? false) {
-      // Collect data from the form
       var pucData = {
         'certificateNumber': _certificateNumberController.text,
         'dateOfIssue': _pucDateOfIssueController.text,
         'dateOfExpiry': _pucDateOfExpiryController.text,
       };
 
-      // Save data to Firebase Realtime Database
       try {
-        // Generate a unique key for the PUC data
-         // Add data to Firebase Realtime Database
-      // Generate a new key for the insurance data
-      String user= FirebaseAuth.instance.currentUser!.uid;
+        String userId = FirebaseAuth.instance.currentUser!.uid;
+        await databaseRef.doc(userId).set({
+          "id": userId,
+          "PUC": pucData,
+        }, SetOptions(merge: true));
 
-       await databaseRef.doc(user).update({
-  "id": FirebaseAuth.instance.currentUser!.uid,
-"PUC": pucData,    // Directly passing the map
-});
-
-        
-        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('PUC added successfully')),
         );
 
-        // Optionally, navigate back or reset the form
-        Navigator.popAndPushNamed(context,Routes.homeScreen); // Go back to the previous screen after submission
+        Navigator.pop(context);
       } catch (e) {
-        // Handle errors and show an error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
         );

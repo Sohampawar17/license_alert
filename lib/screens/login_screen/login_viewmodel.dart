@@ -40,9 +40,9 @@ bool res=false;
 
   void loginwithUsernamePassword(BuildContext context) async {
   var connectivityResult = await Connectivity().checkConnectivity();
-  
-  if (connectivityResult == ConnectivityResult.mobile || connectivityResult == ConnectivityResult.wifi) {
-    
+ // Check if any of the results include mobile or wifi
+if (connectivityResult.contains(ConnectivityResult.mobile) || 
+    connectivityResult.contains(ConnectivityResult.wifi)) {
     notifyListeners();
     
     String username = usernameController.text;

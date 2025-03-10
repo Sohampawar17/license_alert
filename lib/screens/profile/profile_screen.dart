@@ -1,139 +1,235 @@
-import 'package:flutter/material.dart';  
-import '../../models/user_profile.dart';  
-import '../../services/userdata_services.dart';  
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
-class ProfilePage extends StatefulWidget {  
-  const ProfilePage({super.key});  
+class ProfilePage extends StatefulWidget {
+  const ProfilePage({super.key});
 
-  @override  
-  State<ProfilePage> createState() => _ProfilePageState();  
-}  
+  @override
+  _ProfilePageState createState() => _ProfilePageState();
+}
 
-class _ProfilePageState extends State<ProfilePage> {  
-  @override  
-  Widget build(BuildContext context) {  
-    return FutureBuilder<UserProfile?>(  
-      future: FirebaseService().getUserProfile(),  
-      builder: (context, snapshot) {  
-        return Scaffold(  
-          appBar: AppBar(  
-            title: const Text('Profile'),  
-            centerTitle: true,  
-             // Change to your desired color  
-          ),  
-          body: _buildBody(snapshot),  
-        );  
-      },  
-    );  
-  }  
+class _ProfilePageState extends State<ProfilePage> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ImagePicker _picker = ImagePicker();
 
-  Widget _buildBody(AsyncSnapshot<UserProfile?> snapshot) {  
-    if (snapshot.connectionState == ConnectionState.waiting) {  
-      return _buildLoadingIndicator();  
-    } else if (snapshot.connectionState == ConnectionState.done) {  
-      if (snapshot.hasData) {  
-        final userProfile = snapshot.data;  
-        return _buildProfileContent(userProfile!);  
-      } else {  
-        return _buildNoProfileDataFound();  
-      }  
-    } else if (snapshot.hasError) {  
-      return _buildErrorState(snapshot.error.toString());  
-    } else {  
-      return const Center(child: Text('Unknown state.'));  
-    }  
-  }  
+  User? _user;
+  bool isEditing = false;
+  File? _imageFile;
+  String? _imageUrl;
 
-  Widget _buildLoadingIndicator() {  
-    return Center(  
-      child: CircularProgressIndicator(),  
-    );  
-  }  
+  TextEditingController nameController = TextEditingController();
+  TextEditingController emailController = TextEditingController();
+  TextEditingController phoneController = TextEditingController();
 
-  Widget _buildNoProfileDataFound() {  
-    return const Center(  
-      child: Text(  
-        'No profile data found.',  
-        style: TextStyle(fontSize: 18, color: Colors.red),  
-      ),  
-    );  
-  }  
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserData();
+  }
 
-  Widget _buildErrorState(String error) {  
-    return Center(  
-      child: Text(  
-        'Error fetching profile data: $error',  
-        style: TextStyle(color: Colors.red),  
-      ),  
-    );  
-  }  
+  // Fetch user data from Firebase
+  Future<void> _fetchUserData() async {
+    _user = _auth.currentUser;
+    if (_user != null) {
+      DocumentSnapshot userDoc =
+          await _firestore.collection('users').doc(_user!.email).get();
 
-  Widget _buildProfileContent(UserProfile userProfile) {  
-    return Padding(  
-      padding: const EdgeInsets.all(16.0),  
-      child: ListView(  
-        children: [  
-          // Profile Picture  
-          Center(  
-            child: CircleAvatar(  
-              radius: 50,  
-              backgroundImage: userProfile.profilePictureUrl != null  
-                  ? NetworkImage(userProfile.profilePictureUrl!)  
-                  : const AssetImage('assets/default_avatar.png') as ImageProvider,  
-            ),  
-          ),  
-          const SizedBox(height: 16),  
-          // User Name  
-          Text(  
-            userProfile.name ?? 'No Name',  
-            textAlign: TextAlign.center,  
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),  
-          ),  
-          const SizedBox(height: 8),  
-          // User Email and Phone Number  
-          _buildInfoItem(Icons.email, userProfile.email ?? 'No Email'),  
-          _buildInfoItem(Icons.phone, userProfile.phoneNumber ?? 'No Phone'),  
-          const SizedBox(height: 20),  
-          // Edit Profile Button  
-          ElevatedButton(  
-            onPressed: () {  
-              // TODO: Implement edit profile functionality  
-            },  
-            child: const Text('Edit Profile'),  
-            style: ElevatedButton.styleFrom(  
-              padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 24.0),  
-              shape: RoundedRectangleBorder(  
-                borderRadius: BorderRadius.circular(30.0),  
-              ),  
-            ),  
-          ),  
-        ],  
-      ),  
-    );  
-  }  
+      setState(() {
+        nameController.text = userDoc['name'] ?? _user!.displayName ?? "";
+        emailController.text = _user!.email ?? "";
+        phoneController.text = userDoc['phone'] ?? "";
+        _imageUrl = userDoc['photoUrl'] ?? _user!.photoURL;
+      });
+    }
+  }
 
-  Widget _buildInfoItem(IconData icon, String info) {  
-    return Card(  
-      elevation: 4,  
-      shape: RoundedRectangleBorder(  
-        borderRadius: BorderRadius.circular(10),  
-      ),  
-      margin: const EdgeInsets.symmetric(vertical: 8),  
-      child: Padding(  
-        padding: const EdgeInsets.all(16.0),  
-        child: Row(  
-          children: [  
-            Icon(icon,),  
-            const SizedBox(width: 10),  
-            Expanded(  
-              child: Text(  
-                info,  
-                style: const TextStyle(fontSize: 18),  
-              ),  
-            ),  
-          ],  
-        ),  
-      ),  
-    );  
-  }  
+  // Pick Image from Camera or Gallery
+  Future<void> _pickImage(ImageSource source) async {
+    final pickedFile = await _picker.pickImage(source: source);
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
+      await _uploadImage();
+    }
+  }
+
+  Future<void> _uploadImage() async {
+    if (_imageFile == null || _user == null) return;
+
+    try {
+      String filePath = 'profile_pictures/${_user!.uid}.jpg';
+      Reference ref = FirebaseStorage.instance.ref().child(filePath);
+
+      UploadTask uploadTask = ref.putFile(_imageFile!);
+      TaskSnapshot snapshot = await uploadTask.whenComplete(() => null);  // Ensure completion
+
+      String downloadUrl = await snapshot.ref.getDownloadURL();
+
+      await _firestore.collection('users').doc(_user!.uid).update({
+        'photoUrl': downloadUrl,
+      });
+
+      await _user!.updatePhotoURL(downloadUrl);
+
+      setState(() {
+        _imageUrl = downloadUrl;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Profile picture updated successfully!")),
+      );
+    } catch (e) {
+      print("🔥 Error uploading image: $e");
+    }
+  }
+
+  // Update user info in Firebase Firestore & Authentication
+  Future<void> _updateUserData() async {
+    if (_user != null) {
+      await _firestore.collection('users').doc(_user!.email).update({
+        'name': nameController.text,
+        'phone': phoneController.text,
+      });
+
+      await _user!.updateDisplayName(nameController.text);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Profile Updated Successfully!")),
+      );
+
+      setState(() {
+        isEditing = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Profile"),
+        backgroundColor: Colors.lightBlueAccent,
+        elevation: 0,
+      ),
+      body: _user == null
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Profile Picture
+                  Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      CircleAvatar(
+                        radius: 60,
+                        backgroundImage: _imageUrl != null
+                            ? NetworkImage(_imageUrl!)
+                            : const AssetImage("assets/images/profile.png")
+                                as ImageProvider,
+                      ),
+                      if (isEditing)
+                        IconButton(
+                          icon: const Icon(Icons.camera_alt, color: Colors.blue),
+                          onPressed: () => _showImagePickerOptions(),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Profile Fields
+                  _buildProfileField("Full Name", nameController),
+                  _buildProfileField("Email", emailController, isEditable: false),
+                  _buildProfileField("Phone Number", phoneController),
+
+                  const SizedBox(height: 20),
+
+                  // Save Button
+                  if (isEditing)
+                    ElevatedButton(
+                      onPressed: _updateUserData,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 12, horizontal: 24),
+                      ),
+                      child: const Text("Save Changes",
+                          style: TextStyle(fontSize: 16)),
+                    ),
+                ],
+              ),
+            ),
+
+      // Edit Button
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          setState(() {
+            isEditing = !isEditing;
+          });
+        },
+        backgroundColor: Colors.blueAccent,
+        child: Icon(isEditing ? Icons.close : Icons.edit, color: Colors.white),
+      ),
+    );
+  }
+
+  // Show Image Picker Options (Camera / Gallery)
+  void _showImagePickerOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera),
+              title: const Text("Take a Photo"),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text("Choose from Gallery"),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Reusable Profile Field
+  Widget _buildProfileField(String label, TextEditingController controller,
+      {bool isEditable = true}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black54)),
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          enabled: isEditing && isEditable,
+          decoration: InputDecoration(
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            filled: true,
+            fillColor: isEditing ? Colors.white : Colors.grey.shade100,
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
 }

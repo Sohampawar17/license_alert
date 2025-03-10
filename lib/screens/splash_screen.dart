@@ -29,7 +29,7 @@ class _SplashScreenState extends State<SplashScreen> {
             fit: BoxFit.cover,           // This makes the image fill the entire screen
           ),
           // Overlay content (like text or logo)
-          Center(
+          const Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
